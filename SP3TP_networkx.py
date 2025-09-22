@@ -16,23 +16,28 @@ class TransformedDigraph(nx.DiGraph):
     that of arc (v,w) in A. Let u,v,w in V such that (u,v) and (v,w) belong to A, then there is an arc
     (v_u, w_v) in T with cost equal to (v,w) plus the penalty of the turn u->v->w.
 
-    This class inherits from networkx.DiGraph and adds the attribute exploded_nodes to map each original node to
-    its corresponding nodes in the transformed digraph.
-    """
+    We proved that, given v in V, any path beginning at v_. in the transformed digraph represents a unique path
+    without forbidden paths in G. Even more, the cost of a path in T is equal to the cost of its represented path in G
+    plus the turn penalties.
 
+    This class inherits from networkx.DiGraph and adds the attribute exploded_nodes to map each original node to
+    its corresponding nodes in the transformed digraph. Given a digraph G the transformed digraph can be obtained by
+    calling TransformedDigraph.transform . Once the transformed digraph is obtained, it can be used to calculate the
+    shortest penalised paths using any node in G as source.
+    """
 
     def __init__(self,incoming_graph_data=None, **attr):
         super().__init__(incoming_graph_data, **attr)
         self._exploded_nodes = {}
 
     @classmethod
-    def transform(cls, G, fpaths, turn_penalty, weight, allow_u_turns=False, dead_ends=None, **kwargs):
+    def transform(cls, G, fpaths, turn_penalty, weight, allow_u_turns=None, **kwargs):
         """
         Creates T, the transformation of digraph G by exploding its nodes in such way that any path in T
         represents a unique path in G without forbidden paths. Even more, the cost of a path in T is equal to the
         cost of its represented path in G plus the turn penalties.
         
-        Forbidden paths must be sequences of exactly 3 nodes (u,v,w) of V(G).
+        Forbidden paths must be sequences of exactly 3 nodes (u,v,w) of G.
         
         :param G: digraph to be transformed
         :type G: networkx.DiGraph
@@ -44,16 +49,17 @@ class TransformedDigraph(nx.DiGraph):
         :type turn_penalty: function
         :param weight: arc weights will be accessed via the edge attribute with this key
         :type weight: str
-        :param allow_u_turns: indicates if U-turns are allowed.
-        :type allow_u_turns: bool
-        :param dead_ends: set of nodes where U-turns are allowed (in case allow_u_turns is False)
-        :type dead_ends: None | set[int] | set[str]
+        :param allow_u_turns: set of nodes where U-turns are allowed. None if U-turns are never allowed.
+        :type allow_u_turns: None | set[int] | set[str]
         :param kwargs: keyword arguments for turn_penalty function
         :type kwargs: dict
         :return: transformation of digraph G
         :rtype: TransformedDigraph
         """
-        
+
+        if allow_u_turns is None:
+            allow_u_turns = set()
+
         # Dictionary to map every original node to the its exploded nodes in T
         exploded_nodes = defaultdict(set)
 
@@ -70,11 +76,10 @@ class TransformedDigraph(nx.DiGraph):
         for n in G.nodes:
             for a in G.predecessors(n):
                 for m in G.predecessors(a):
-                    if ((allow_u_turns or (not allow_u_turns and (m != n or a in dead_ends))) and (m, a, n)
-                            not in fpaths.get(a, set())) :
+                    if (m != n or a in allow_u_turns) and (m, a, n) not in fpaths.get(a, set()):
                         T.add_edge(f'{a}_{m}', f'{n}_{a}',
                                              weight=G.edges[a, n][weight] + turn_penalty(m, a, n, **kwargs))
-                T.add_edge(f'{a}_.', f'{n}_{a}', cost=G.edges[a, n][weight])
+                T.add_edge(f'{a}_.', f'{n}_{a}', weight=G.edges[a, n][weight])
 
         T._exploded_nodes = exploded_nodes
 
@@ -98,7 +103,7 @@ class TransformedDigraph(nx.DiGraph):
         """
         conv_f = type(source)
 
-        t_cost, t_path = nx.shortest_paths.single_source_dijkstra(self, f'{source}_.', weight='cost')
+        t_cost, t_path = nx.shortest_paths.single_source_dijkstra(self, f'{source}_.', weight='weight')
 
         cost = {}
         path = {}
