@@ -7,12 +7,17 @@ import networkx as nx
 
 class TransformedDigraph(nx.DiGraph):
     """
-    Creates a transformed version of a digraph G=(V,A). The transformation is carried on by `exploding` each node v
-    into d+1 vertices, where d is the in-degree of v. One of these vertices, v_. , represents the case where the path
-    starts at v. Then, for each predecessor u of v, the vertex v_u represents the case where v is visited after
-    visiting u.
+    Creates a transformed version of a weighted digraph G=(V,A,c). The transformation is carried on by `exploding` each
+    node v into d+1 vertices, where d is the in-degree of v. One of these vertices, v_. , represents the case where the
+    path starts at v. Let N_in(v) and N_out(v) be the in_neighbourhood and out-neighbourhood of v, respectively.
+    Then, for each u in N_in(v), the vertex v_u represents the case where v is visited after visiting u.
 
-    For each v in V(G), v_.
+    For each v in V, for each w in N_out(v), in the transformed digraph T there is an arc (v_.,w_v) with cost equal to
+    that of arc (v,w) in A. Let u,v,w in V such that (u,v) and (v,w) belong to A, then there is an arc
+    (v_u, w_v) in T with cost equal to (v,w) plus the penalty of the turn u->v->w.
+
+    This class inherits from networkx.DiGraph and adds the attribute exploded_nodes to map each original node to
+    its corresponding nodes in the transformed digraph.
     """
 
 
